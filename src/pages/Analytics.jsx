@@ -104,7 +104,7 @@ export default function Analytics() {
         Products that show up most often as a suggested substitute.
       </Typography>
       <RankedList
-        rows={summary.topRecommendedProducts}
+        rows={summary.topRecommendedProducts.filter((r) => r.productName)}
         countKey="totalRecommendations"
         countLabel="times recommended"
         emptyText="No recommendation data yet."
@@ -120,7 +120,7 @@ export default function Analytics() {
         not by time.
       </Typography>
       <RankedList
-        rows={summary.topSourceProducts}
+        rows={summary.topSourceProducts.filter((r) => r.productName)}
         countKey="totalTimesRecommended"
         countLabel="searches"
         emptyText="No search history yet."
