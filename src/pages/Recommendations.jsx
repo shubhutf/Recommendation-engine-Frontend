@@ -20,7 +20,7 @@ import { tokens } from "../theme/theme.js";
 
 export default function Recommendations() {
   const [products, setProducts] = useState([]);
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedId, setSelectedId] = useState(""); // starts empty — no auto-selection
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -28,12 +28,16 @@ export default function Recommendations() {
     (async () => {
       const list = await getAllProducts();
       setProducts(list);
-      if (list.length) setSelectedId(list[0].id);
+      // no auto-select here — the user must deliberately pick a product,
+      // so Analytics only logs real, intentional searches.
     })();
   }, []);
 
   useEffect(() => {
-    if (!selectedId) return;
+    if (!selectedId) {
+      setResults([]);
+      return;
+    }
     (async () => {
       setLoading(true);
       const recs = await getRecommendations(selectedId);
@@ -59,9 +63,15 @@ export default function Recommendations() {
         isOptionEqualToValue={(option, value) => option.id === value.id}
         sx={{ width: 320, mb: 4 }}
         renderInput={(params) => (
-          <TextField {...params} label="Selected product" sx={{ bgcolor: tokens.card }} />
+          <TextField {...params} label="Select a product to see substitutes" sx={{ bgcolor: tokens.card }} />
         )}
       />
+
+      {!selectedId && !loading && (
+        <Typography variant="body2" sx={{ color: tokens.slate }}>
+          Pick a product above to see its ranked substitutes.
+        </Typography>
+      )}
 
       {selected && (
         <Box
@@ -144,7 +154,7 @@ export default function Recommendations() {
               </Card>
             </Grid>
           ))}
-          {!loading && results.length === 0 && (
+          {!loading && selectedId && results.length === 0 && (
             <Typography sx={{ color: tokens.slate, px: 1 }}>
               No substitutes found in the same category yet.
             </Typography>
