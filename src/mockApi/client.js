@@ -1,86 +1,112 @@
-import { products as seedProducts, inventory as seedInventory } from "../data/products.js";
-import { getRecommendations as scoreRecommendations } from "../services/recommendationEngine.js";
+import axiosClient from "../api/axiosClient.js";
 
-const LATENCY = 300;
-let products = [...seedProducts];
-let inventory = [...seedInventory];
-const recommendationLog = [];
-
-function delay(value) {
-  return new Promise((resolve) => setTimeout(() => resolve(value), LATENCY));
-}
-function stockMap() {
-  return Object.fromEntries(inventory.map((i) => [i.productId, i.availableQuantity]));
+function normalize(product) {
+  return { ...product, id: product._id };
 }
 
-// ---- Products (matches product.controller.js) ----
-export async function getAllProducts(query = {}) {
-  let result = products.map((p) => ({ ...p, availableQuantity: stockMap()[p.id] ?? 0 }));
-  if (query.category) result = result.filter((p) => p.category === query.category);
-  if (query.brand) result = result.filter((p) => p.brand === query.brand);
-  return delay(result);
-}
-export async function createProduct(productData) {
-  const newProduct = { id: `p${Date.now()}`, createdAt: new Date().toISOString().slice(0, 10), ...productData };
-  products = [...products, newProduct];
-  inventory = [...inventory, { productId: newProduct.id, availableQuantity: productData.availableQuantity ?? 0, updatedAt: newProduct.createdAt }];
-  return delay(newProduct);
-}
-export async function updateProduct(productId, updateData) {
-  products = products.map((p) => (p.id === productId ? { ...p, ...updateData } : p));
-  return delay(products.find((p) => p.id === productId));
-}
-export async function deleteProduct(productId) {
-  const deleted = products.find((p) => p.id === productId) ?? null;
-  products = products.filter((p) => p.id !== productId);
-  inventory = inventory.filter((i) => i.productId !== productId);
-  return delay(deleted);
-}
-
-// ---- Categories & Brands (part of Product Management per the doc) ----
-let categories = ["Dairy", "Detergent"];
-let brands = ["Amul", "Nestle", "Mother Dairy", "Aavin", "Heritage", "Tide", "Ariel", "Surf Excel", "Rin"];
-
+// ---- Categories & Brands ----
+// Not separate collections — derived live from real products, so they're never stale
+// and never fake. No "create" functions needed: typing a new category/brand on a
+// product IS creating it, since it's just a field value, not its own entity.
 export async function getCategories() {
-  return delay([...categories]);
+  const products = await getAllProducts();
+  return [...new Set(products.map((p) => p.category).filter(Boolean))];
 }
-export async function createCategory(name) {
-  if (!categories.includes(name)) categories = [...categories, name];
-  return delay([...categories]);
-}
+
 export async function getBrands() {
-  return delay([...brands]);
-}
-export async function createBrand(name) {
-  if (!brands.includes(name)) brands = [...brands, name];
-  return delay([...brands]);
+  const products = await getAllProducts();
+  return [...new Set(products.map((p) => p.brand).filter(Boolean))];
 }
 
-// ---- Inventory (matches inventory.controller.js) ----
+// ---- Products ----
+export async function getAllProducts(query = {}) {
+  // backend paginates (default 10/page) — pull a high limit so the frontend gets everything
+  const res = await axiosClient.get("/products", { params: { limit: 100, ...query } });
+  const products = res.data.data.products.map(normalize);
+
+  // backend doesn't include stock on the product itself — merge it in from inventory
+  const inventory = await getAllInventory();
+  const stockMap = Object.fromEntries(inventory.map((i) => [i.productId, i.availableQuantity]));
+
+  return products.map((p) => ({ ...p, availableQuantity: stockMap[p.id] ?? 0 }));
+}
+
+export async function createProduct(productData) {
+  const res = await axiosClient.post("/products", productData);
+  return normalize(res.data.data);
+}
+
+export async function updateProduct(productId, updateData) {
+  const res = await axiosClient.put(`/products/${productId}`, updateData);
+  return normalize(res.data.data);
+}
+
+export async function deleteProduct(productId) {
+  const res = await axiosClient.delete(`/products/${productId}`);
+  return res.data.data;
+}
+
+// ---- Inventory ----
 export async function getAllInventory() {
-  return delay(inventory.map((i) => ({ ...i, product: products.find((p) => p.id === i.productId) ?? null })));
-}
-export async function createInventory({ productId, availableQuantity }) {
-  const entry = { productId, availableQuantity, updatedAt: new Date().toISOString().slice(0, 10) };
-  inventory = [...inventory, entry];
-  return delay(entry);
-}
-export async function updateInventory(id, updateData) {
-  inventory = inventory.map((i) => (i.productId === id ? { ...i, ...updateData, updatedAt: new Date().toISOString().slice(0, 10) } : i));
-  return delay(inventory.find((i) => i.productId === id));
-}
-
-// ---- Recommendations (matches recommendation.controller.js) ----
-export async function getRecommendations(productId, limit = 5) {
-  const source = products.find((p) => p.id === productId);
-  if (!source) return delay([]);
-  const results = scoreRecommendations(source, products, stockMap(), Number(limit));
-  results.forEach((r) => {
-    recommendationLog.push({ sourceProductId: productId, recommendedProductId: r.product.id, recommendationScore: r.score, timestamp: new Date().toISOString() });
+  const res = await axiosClient.get("/inventory");
+  return res.data.data.map((i) => {
+    const populatedProduct = typeof i.productId === "object" ? i.productId : null;
+    return {
+      ...i,
+      id: i._id,
+      productId: populatedProduct ? populatedProduct._id : i.productId,
+      product: populatedProduct ? { ...populatedProduct, id: populatedProduct._id } : null,
+    };
   });
-  return delay(results);
-}
-export async function getRecommendationLog() {
-  return delay([...recommendationLog]);
 }
 
+export async function createInventory({ productId, availableQuantity }) {
+  const res = await axiosClient.post("/inventory", { productId, availableQuantity });
+  return res.data.data;
+}
+
+export async function updateInventory(inventoryId, updateData) {
+  const res = await axiosClient.put(`/inventory/${inventoryId}`, updateData);
+  return res.data.data;
+}
+
+// ---- Recommendations ----
+// Backend returns plain product objects only — no score, no stock, no breakdown.
+// We merge in stock from inventory ourselves so the UI can still show in/out-of-stock.
+export async function getRecommendations(productId) {
+  const res = await axiosClient.get(`/recommendations/${productId}`);
+
+  if (!Array.isArray(res.data.recommendations)) {
+    console.warn(`No recommendations returned for product ${productId}:`, res.data);
+    return [];
+  }
+
+  const { recommendations } = res.data;
+  const allProducts = await getAllProducts();
+
+  return recommendations
+    .map((r) => {
+      const product = allProducts.find((p) => p.id === r.productId);
+      if (!product) return null;
+      return {
+        product,
+        score: Math.round(r.score * 100),
+        breakdown: r.breakdown,
+        stock: r.breakdown.inventoryScore > 0,
+        explanation: r.explanation,
+      };
+    })
+    .filter(Boolean);
+}
+
+// No real backend endpoint for this yet — Analytics page will need a small rework
+// (see note when we get to that page).
+export async function getRecommendationLog() {
+  return [];
+}
+
+// ---- Analytics (matches analyticsService.js — real data, no separate wrapper) ----
+export async function getAnalyticsSummary() {
+  const res = await axiosClient.get("/analytics/summary");
+  return res.data; // this route returns the summary object directly, no {success, data} wrapper
+}

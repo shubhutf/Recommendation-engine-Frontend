@@ -45,8 +45,12 @@ export default function Layout() {
         </Stack>
 
         <Box sx={{ mt: "auto", px: 3, py: 3 }}>
-          <Typography variant="caption" sx={{ color: tokens.slateLight, display: "block" }}>Demo mode</Typography>
-          <Typography variant="caption" sx={{ color: tokens.slateLight }}>Running on dummy data</Typography>
+          <Typography variant="caption" sx={{ color: tokens.slateLight, display: "block" }}>
+            Live backend
+          </Typography>
+          <Typography variant="caption" sx={{ color: tokens.slateLight }}>
+            MongoDB + Gemini AI
+          </Typography>
         </Box>
       </Box>
 

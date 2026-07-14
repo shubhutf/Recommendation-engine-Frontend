@@ -7,7 +7,7 @@ import {
   CardContent,
   CardMedia,
   Chip,
-  MenuItem,
+  Autocomplete,
   TextField,
   Stack,
   CircularProgress,
@@ -15,7 +15,6 @@ import {
 } from "@mui/material";
 import ArrowRightAltIcon from "@mui/icons-material/ArrowRightAlt";
 import { getAllProducts, getRecommendations } from "../mockApi/client.js";
-import { generateExplanation } from "../services/aiExplain.js";
 import ScoreRing from "../components/ScoreRing.jsx";
 import { tokens } from "../theme/theme.js";
 
@@ -23,7 +22,6 @@ export default function Recommendations() {
   const [products, setProducts] = useState([]);
   const [selectedId, setSelectedId] = useState("");
   const [results, setResults] = useState([]);
-  const [explanations, setExplanations] = useState({});
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -38,19 +36,11 @@ export default function Recommendations() {
     if (!selectedId) return;
     (async () => {
       setLoading(true);
-      setExplanations({});
-      const recs = await getRecommendations(selectedId, 3);
+      const recs = await getRecommendations(selectedId);
       setResults(recs);
       setLoading(false);
-
-      const source = products.find((p) => p.id === selectedId);
-      recs.forEach(async (rec) => {
-        const text = await generateExplanation(source, rec);
-        setExplanations((prev) => ({ ...prev, [rec.product.id]: text }));
-      });
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, products.length]);
+  }, [selectedId]);
 
   const selected = products.find((p) => p.id === selectedId);
 
@@ -61,19 +51,17 @@ export default function Recommendations() {
         AI-generated reason for each recommendation.
       </Typography>
 
-      <TextField
-        select
-        label="Selected product"
-        value={selectedId}
-        onChange={(e) => setSelectedId(e.target.value)}
-        sx={{ width: 320, mb: 4, bgcolor: tokens.card }}
-      >
-        {products.map((p) => (
-          <MenuItem key={p.id} value={p.id}>
-            {p.productName} — ₹{p.price}
-          </MenuItem>
-        ))}
-      </TextField>
+      <Autocomplete
+        options={products}
+        getOptionLabel={(p) => `${p.productName} — ₹${p.price}`}
+        value={products.find((p) => p.id === selectedId) ?? null}
+        onChange={(_, newValue) => setSelectedId(newValue?.id ?? "")}
+        isOptionEqualToValue={(option, value) => option.id === value.id}
+        sx={{ width: 320, mb: 4 }}
+        renderInput={(params) => (
+          <TextField {...params} label="Selected product" sx={{ bgcolor: tokens.card }} />
+        )}
+      />
 
       {selected && (
         <Box
@@ -145,17 +133,12 @@ export default function Recommendations() {
 
                 <CardContent>
                   <Chip
-                    label={rec.stock > 0 ? "In stock" : "Out of stock"}
+                    label={rec.stock ? "In stock" : "Out of stock"}
                     size="small"
-                    sx={{ mb: 1.5, bgcolor: rec.stock > 0 ? "#DFF6C0" : "#FFDCD1", color: tokens.ink }}
+                    sx={{ mb: 1.5, bgcolor: rec.stock ? "#DFF6C0" : "#FFDCD1", color: tokens.ink }}
                   />
-                  <Typography variant="body2" sx={{ color: tokens.slate, minHeight: 60 }}>
-                    {explanations[rec.product.id] ?? (
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <CircularProgress size={12} sx={{ color: tokens.limeDeep }} />
-                        <span>Generating explanation…</span>
-                      </Stack>
-                    )}
+                  <Typography variant="body2" sx={{ color: tokens.slate }}>
+                    {rec.explanation}
                   </Typography>
                 </CardContent>
               </Card>
@@ -163,8 +146,7 @@ export default function Recommendations() {
           ))}
           {!loading && results.length === 0 && (
             <Typography sx={{ color: tokens.slate, px: 1 }}>
-              No substitutes found in the same category yet — add more products on the Products
-              page.
+              No substitutes found in the same category yet.
             </Typography>
           )}
         </Grid>

@@ -34,12 +34,15 @@ export default function Inventory() {
   }, []);
 
   function startEdit(row) {
-    setEditingId(row.productId);
+    setEditingId(row.id);
     setDraftQty(String(row.availableQuantity));
   }
 
-  async function saveEdit(productId) {
-    await updateInventory(productId, { availableQuantity: Number(draftQty) });
+ async function saveEdit(row) {
+    await updateInventory(row.id, {
+      productId: row.productId,
+      availableQuantity: Number(draftQty),
+    });
     setEditingId(null);
     load();
   }
@@ -69,11 +72,11 @@ export default function Inventory() {
           </TableHead>
           <TableBody>
             {rows.map((row) => (
-              <TableRow key={row.productId} hover>
+              <TableRow key={row.id} hover>
                 <TableCell sx={{ fontWeight: 600 }}>{row.product?.productName}</TableCell>
                 <TableCell>{row.product?.category}</TableCell>
                 <TableCell align="right" className="mono">
-                  {editingId === row.productId ? (
+                  {editingId === row.id ? (
                     <TextField
                       size="small"
                       type="number"
@@ -96,11 +99,11 @@ export default function Inventory() {
                   />
                 </TableCell>
                 <TableCell align="right" sx={{ color: tokens.slate }}>
-                  {row.updatedAt}
+                  {row.updatedAt?.slice(0, 10)}
                 </TableCell>
                 <TableCell align="center">
-                  {editingId === row.productId ? (
-                    <IconButton size="small" onClick={() => saveEdit(row.productId)}>
+                  {editingId === row.id ? (
+                    <IconButton size="small" onClick={() => saveEdit(row)}>
                       <CheckIcon fontSize="small" />
                     </IconButton>
                   ) : (

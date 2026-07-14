@@ -13,7 +13,6 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  MenuItem,
   Stack,
   CircularProgress,
   IconButton,
@@ -22,20 +21,26 @@ import {
 import AddIcon from "@mui/icons-material/Add";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
-import SellOutlinedIcon from "@mui/icons-material/SellOutlined";
 import {
   getAllProducts,
   createProduct,
   updateProduct,
   deleteProduct,
   getCategories,
-  createCategory,
   getBrands,
-  createBrand,
+  createInventory,
 } from "../mockApi/client.js";
 import { tokens } from "../theme/theme.js";
 
-const EMPTY_FORM = { productName: "", category: "Dairy", brand: "", price: "", rating: "", imageUrl: "" };
+const EMPTY_FORM = {
+  productName: "",
+  category: "",
+  brand: "",
+  price: "",
+  rating: "",
+  imageUrl: "",
+  initialQuantity: "",
+};
 
 export default function Products() {
   const [products, setProducts] = useState([]);
@@ -43,8 +48,6 @@ export default function Products() {
   const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
-  const [manageOpen, setManageOpen] = useState(false);
-  const [newCategory, setNewCategory] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
 
@@ -63,7 +66,7 @@ export default function Products() {
 
   function openAddDialog() {
     setEditingId(null);
-    setForm({ ...EMPTY_FORM, category: categories[0] ?? "" });
+    setForm(EMPTY_FORM);
     setOpen(true);
   }
 
@@ -76,19 +79,23 @@ export default function Products() {
       price: String(product.price),
       rating: String(product.rating),
       imageUrl: product.imageUrl,
+      initialQuantity: "",
     });
     setOpen(true);
   }
 
   async function handleSave() {
-    const payload = { ...form, price: Number(form.price), rating: Number(form.rating) };
-    if (form.brand && !brands.includes(form.brand)) {
-      await createBrand(form.brand);
-    }
+    const { initialQuantity, ...productFields } = form;
+    const payload = { ...productFields, price: Number(form.price), rating: Number(form.rating) };
+
     if (editingId) {
       await updateProduct(editingId, payload);
     } else {
-      await createProduct(payload);
+      const newProduct = await createProduct(payload);
+      await createInventory({
+        productId: newProduct.id,
+        availableQuantity: Number(initialQuantity) || 0,
+      });
     }
     setOpen(false);
     setForm(EMPTY_FORM);
@@ -102,28 +109,16 @@ export default function Products() {
     load();
   }
 
-  async function handleAddCategory() {
-    if (!newCategory.trim()) return;
-    await createCategory(newCategory.trim());
-    setNewCategory("");
-    load();
-  }
-
   return (
     <Box>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
         <Typography variant="body2" sx={{ color: tokens.slate }}>
-          Catalog, categories, and brands. Changes here feed straight into the recommendation
-          engine.
+          Catalog, categories, and brands. Categories/brands are pulled live from your products —
+          type a new one on any product to introduce it.
         </Typography>
-        <Stack direction="row" spacing={1.5}>
-          <Button variant="outlined" startIcon={<SellOutlinedIcon />} onClick={() => setManageOpen(true)}>
-            Manage categories
-          </Button>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={openAddDialog}>
-            Add product
-          </Button>
-        </Stack>
+        <Button variant="contained" startIcon={<AddIcon />} onClick={openAddDialog}>
+          Add product
+        </Button>
       </Stack>
 
       {loading ? (
@@ -175,7 +170,6 @@ export default function Products() {
         </Grid>
       )}
 
-      {/* Add / edit product dialog */}
       <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="xs">
         <DialogTitle>{editingId ? "Edit product" : "Add product"}</DialogTitle>
         <DialogContent>
@@ -186,17 +180,13 @@ export default function Products() {
               onChange={(e) => setForm({ ...form, productName: e.target.value })}
               fullWidth
             />
-            <TextField
-              label="Category"
-              select
+            <Autocomplete
+              freeSolo
+              options={categories}
               value={form.category}
-              onChange={(e) => setForm({ ...form, category: e.target.value })}
-              fullWidth
-            >
-              {categories.map((c) => (
-                <MenuItem key={c} value={c}>{c}</MenuItem>
-              ))}
-            </TextField>
+              onInputChange={(_, val) => setForm({ ...form, category: val })}
+              renderInput={(params) => <TextField {...params} label="Category" fullWidth />}
+            />
             <Autocomplete
               freeSolo
               options={brands}
@@ -227,40 +217,22 @@ export default function Products() {
               onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
               fullWidth
             />
+            {!editingId && (
+              <TextField
+                label="Initial stock quantity"
+                type="number"
+                value={form.initialQuantity}
+                onChange={(e) => setForm({ ...form, initialQuantity: e.target.value })}
+                fullWidth
+              />
+            )}
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
           <Button onClick={() => setOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleSave} disabled={!form.productName}>
+          <Button variant="contained" onClick={handleSave} disabled={!form.productName || !form.category}>
             {editingId ? "Save changes" : "Save product"}
           </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Manage categories dialog */}
-      <Dialog open={manageOpen} onClose={() => setManageOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle>Manage categories</DialogTitle>
-        <DialogContent>
-          <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mb: 3, mt: 1 }}>
-            {categories.map((c) => (
-              <Chip key={c} label={c} sx={{ bgcolor: tokens.paper }} />
-            ))}
-          </Stack>
-          <Stack direction="row" spacing={1}>
-            <TextField
-              label="New category"
-              value={newCategory}
-              onChange={(e) => setNewCategory(e.target.value)}
-              fullWidth
-              size="small"
-            />
-            <Button variant="contained" onClick={handleAddCategory}>
-              Add
-            </Button>
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={() => setManageOpen(false)}>Close</Button>
         </DialogActions>
       </Dialog>
     </Box>
