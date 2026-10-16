@@ -4,7 +4,7 @@ import { tokens } from "../theme/theme.js";
 export default function StatCard({ label, value, icon: Icon, accent }) {
   return (
     <Box sx={{ bgcolor: tokens.card, border: `1px solid ${tokens.line}`, borderRadius: 3, p: 2.5, flex: 1, minWidth: 180 }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+      <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "flex-start" }}>
         <Box>
           <Typography variant="caption" sx={{ color: tokens.slate, fontWeight: 600 }}>{label}</Typography>
           <Typography variant="h4" sx={{ mt: 0.5 }}>{value}</Typography>
