@@ -21,7 +21,7 @@ Copy-Item .env.example .env
 # Edit VITE_API_BASE_URL in .env, then restart Vite.
 ```
 
-Start the API/disposable MongoDB and Python scorer using the [backend setup](../Recommendation-engine-backend/README.md). The demo requires no Atlas credentials and displays a visible simulated-catalog banner. Register a customer through the UI; optional local-admin provisioning is explained in the backend README. No deployed app or production database was modified.
+Start the API/disposable MongoDB and Python scorer using the [backend setup](https://github.com/shubhutf/Recommendation-engine-backend#readme). The demo requires no Atlas credentials and displays a visible simulated-catalog banner. Register a customer through the UI; optional local-admin provisioning is explained in the backend README. Local QA uses disposable MongoDB. The authorized production rollout is recorded in [RELEASE](RELEASE.md); the existing production catalog was not reseeded.
 
 ```powershell
 npm run lint
@@ -29,7 +29,7 @@ npm run build
 npm run preview -- --host 127.0.0.1
 ```
 
-Both lint and production build were run successfully. Backend/Python/integration checks and measured metrics are documented in [phase results](../Recommendation-engine-backend/docs/PHASES.md).
+Both lint and production build were run successfully. Backend/Python/integration checks and measured metrics are documented in [phase results](https://github.com/shubhutf/Recommendation-engine-backend/blob/main/docs/PHASES.md).
 
 ## Pages and access
 
@@ -50,4 +50,4 @@ Anonymous users and customers with fewer than five distinct positively interacte
 
 No new chart library was added. Insight importance bars use MUI and values from the trained model. Loading/errors are visible rather than replaced with invented data. Vercel uses `npm run build`, output `dist`, and the included `vercel.json` SPA rewrite so direct links and refreshes reach React Router. The API timeout allows the existing free Render backend to wake after inactivity. Set the production API URL at build time; deployment status is recorded with the release verification.
 
-[Interview notes](INTERVIEW_NOTES.md) explain the architecture and measured results in plain English/Hinglish. The [backend data documentation](../Recommendation-engine-backend/docs/DATA.md) details simulator assumptions and future real-data training.
+[Interview notes](INTERVIEW_NOTES.md) explain the architecture and measured results in plain English/Hinglish. The [backend data documentation](https://github.com/shubhutf/Recommendation-engine-backend/blob/main/docs/DATA.md) details simulator assumptions and future real-data training.
