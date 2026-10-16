@@ -18,4 +18,4 @@
 - `src/pages/Analytics.jsx` shows real-only engine/position CTR from the API. The demo mode banner derives from health data.
 - Page routes are lazy-loaded. Layout supports narrow screens. MUI 9 Stack alignment uses `sx`; all relevant Grid sizing uses `size`.
 - API default uses explicit IPv4 loopback to avoid macOS AirPlay at localhost:5000. Production uses VITE_API_BASE_URL at build time.
-- Lint/build and browser registration/customer nav/cold-start cards/detail click/feedback/Insights were verified locally. No remote deployment was changed.
+- Lint/build and browser registration/customer nav/cold-start cards/detail click/feedback/Insights were verified locally. The subsequent authorized Vercel/Render rollout is recorded in RELEASE.md.
