@@ -20,9 +20,13 @@ export async function getBrands() {
 
 // ---- Products ----
 export async function getAllProducts(query = {}) {
-  // backend paginates (default 10/page) — pull a high limit so the frontend gets everything
-  const res = await axiosClient.get("/products", { params: { limit: 100, ...query } });
+  // Follow server pagination so categories/brands include the complete catalog.
+  const res = await axiosClient.get("/products", { params: { limit: 200, ...query } });
   const products = res.data.data.products.map(normalize);
+  for (let page = 2; page <= res.data.data.pagination.totalPages; page++) {
+    const next = await axiosClient.get("/products", { params: { limit: 200, ...query, page } });
+    products.push(...next.data.data.products.map(normalize));
+  }
 
   // backend doesn't include stock on the product itself — merge it in from inventory
   const inventory = await getAllInventory();
@@ -71,8 +75,7 @@ export async function updateInventory(inventoryId, updateData) {
 }
 
 // ---- Recommendations ----
-// Backend returns plain product objects only — no score, no stock, no breakdown.
-// We merge in stock from inventory ourselves so the UI can still show in/out-of-stock.
+// The API returns selected products, actual engine/version, scores and exposure IDs.
 export async function getRecommendations(productId) {
   const res = await axiosClient.get(`/recommendations/${productId}`);
 
@@ -81,16 +84,13 @@ export async function getRecommendations(productId) {
     return [];
   }
 
-  const { recommendations } = res.data;
-  const allProducts = await getAllProducts();
-
-  return recommendations
+  return res.data.recommendations
     .map((r) => {
-      const product = allProducts.find((p) => p.id === r.productId);
-      if (!product) return null;
+      if (!r.product) return null;
       return {
-        product,
-        score: Math.round(r.score * 100),
+        ...r,
+        product: normalize(r.product),
+        score: r.engine === "rules" ? Math.round(r.score * 100) : r.score,
         breakdown: r.breakdown,
         stock: r.breakdown.inventoryScore > 0,
         explanation: r.explanation,
@@ -99,11 +99,8 @@ export async function getRecommendations(productId) {
     .filter(Boolean);
 }
 
-// No real backend endpoint for this yet — Analytics page will need a small rework
-// (see note when we get to that page).
-export async function getRecommendationLog() {
-  return [];
-}
+export async function recordEvent(event) { return (await axiosClient.post("/events", event)).data; }
+export async function getMLInsights() { return (await axiosClient.get("/ml/insights")).data; }
 
 // ---- Analytics (matches analyticsService.js — real data, no separate wrapper) ----
 export async function getAnalyticsSummary() {

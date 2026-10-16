@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Box, Typography, Stack, LinearProgress, CircularProgress, Divider, Grid } from "@mui/material";
+import { Alert, Box, Typography, Stack, LinearProgress, CircularProgress, Divider, Table, TableHead, TableBody, TableRow, TableCell } from "@mui/material";
 import { getAnalyticsSummary } from "../mockApi/client.js";
 import StatCard from "../components/StatCard.jsx";
 import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
@@ -25,7 +25,7 @@ function RankedList({ rows, countKey, countLabel, emptyText }) {
           key={row.productId}
           sx={{ bgcolor: tokens.card, border: `1px solid ${tokens.line}`, borderRadius: 3, p: 2 }}
         >
-          <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
+          <Stack direction="row" sx={{ mb: 1, justifyContent: "space-between" }}>
             <Box>
               <Typography sx={{ fontWeight: 600 }}>
                 {row.productName ?? "Unknown product"}
@@ -59,23 +59,25 @@ function RankedList({ rows, countKey, countLabel, emptyText }) {
 export default function Analytics() {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     (async () => {
-      setSummary(await getAnalyticsSummary());
-      setLoading(false);
+      try { setSummary(await getAnalyticsSummary()); }
+      catch (err) { setError(err.response?.data?.message || "Unable to load analytics"); }
+      finally { setLoading(false); }
     })();
   }, []);
 
   if (loading) {
     return <CircularProgress sx={{ color: tokens.limeDeep }} />;
   }
+  if (error) return <Alert severity="error">{error}</Alert>;
 
   return (
     <Box>
       <Typography variant="body2" sx={{ color: tokens.slate, mb: 3 }}>
-        Real recommendation usage pulled straight from the database — no session-only or fake
-        data.
+        Real interaction events only. Simulated training data and legacy seed rows are excluded.
       </Typography>
 
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 4 }}>
@@ -96,6 +98,17 @@ export default function Analytics() {
           icon={ManageSearchOutlinedIcon}
         />
       </Stack>
+
+      <Typography variant="h6">Click-through rate by engine and position</Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Unique clicks per served impression. These observational rates do not establish which engine causes more clicks.</Typography>
+      <Box sx={{ overflowX: "auto", mb: 4 }}><Table size="small" aria-label="Interaction metrics">
+        <TableHead><TableRow>{["Engine", "Position", "Impressions", "Clicks", "CTR"].map(label => <TableCell key={label}>{label}</TableCell>)}</TableRow></TableHead>
+        <TableBody>{(summary.interactions?.byPositionAndEngine || []).map(row => <TableRow key={`${row.engine}-${row.position}`}>
+          <TableCell>{row.engine}</TableCell><TableCell>{row.position}</TableCell><TableCell>{row.impressions}</TableCell><TableCell>{row.clicks}</TableCell><TableCell>{row.ctr == null ? "—" : `${(row.ctr * 100).toFixed(2)}%`}</TableCell>
+        </TableRow>)}</TableBody>
+      </Table></Box>
+      {!summary.interactions?.byPositionAndEngine?.length && <Typography sx={{ mb: 3 }}>No real interaction data yet.</Typography>}
+      {summary.logging?.dropped > 0 && <Alert severity="warning">{summary.logging.dropped} logging batches were dropped in this process. Counts may under-report served impressions.</Alert>}
 
       <Typography variant="h6" sx={{ mb: 2 }}>
         Most Recommended Products

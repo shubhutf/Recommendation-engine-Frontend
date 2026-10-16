@@ -17,8 +17,10 @@ import {
   CircularProgress,
   IconButton,
   Autocomplete,
+  Alert,
 } from "@mui/material";
-import AddIcon from "@mui/icons-material/Add";
+import AddIcon from "@mui/icons-material/AddOutlined";
+import { useAuth } from "../auth/AuthContext.js";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DeleteOutlinedIcon from "@mui/icons-material/DeleteOutlined";
 import {
@@ -43,6 +45,8 @@ const EMPTY_FORM = {
 };
 
 export default function Products() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
@@ -50,18 +54,19 @@ export default function Products() {
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [error, setError] = useState("");
 
   async function load() {
     setLoading(true);
-    const [p, c, b] = await Promise.all([getAllProducts(), getCategories(), getBrands()]);
-    setProducts(p);
-    setCategories(c);
-    setBrands(b);
-    setLoading(false);
+    try {
+      const [p, c, b] = await Promise.all([getAllProducts(), getCategories(), getBrands()]);
+      setProducts(p); setCategories(c); setBrands(b); setError("");
+    } catch (err) { setError(err.response?.data?.message || "Unable to load catalog"); }
+    finally { setLoading(false); }
   }
 
   useEffect(() => {
-    load();
+    Promise.resolve().then(load);
   }, []);
 
   function openAddDialog() {
@@ -85,6 +90,7 @@ export default function Products() {
   }
 
   async function handleSave() {
+    try {
     const { initialQuantity, ...productFields } = form;
     const payload = { ...productFields, price: Number(form.price), rating: Number(form.rating) };
 
@@ -101,24 +107,26 @@ export default function Products() {
     setForm(EMPTY_FORM);
     setEditingId(null);
     load();
+    } catch (err) { setError(err.response?.data?.message || "Unable to save product"); }
   }
 
   async function handleDelete(id) {
     if (!window.confirm("Delete this product?")) return;
-    await deleteProduct(id);
-    load();
+    try { await deleteProduct(id); load(); }
+    catch (err) { setError(err.response?.data?.message || "Unable to delete product"); }
   }
 
   return (
     <Box>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      <Stack direction="row" sx={{ mb: 3, justifyContent: "space-between", alignItems: "center" }}>
         <Typography variant="body2" sx={{ color: tokens.slate }}>
           Catalog, categories, and brands. Categories/brands are pulled live from your products —
           type a new one on any product to introduce it.
         </Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={openAddDialog}>
+        {isAdmin && <Button variant="contained" startIcon={<AddIcon />} onClick={openAddDialog}>
           Add product
-        </Button>
+        </Button>}
       </Stack>
 
       {loading ? (
@@ -126,9 +134,9 @@ export default function Products() {
       ) : (
         <Grid container spacing={2.5}>
           {products.map((p) => (
-            <Grid item xs={12} sm={6} md={4} lg={3} key={p.id}>
+            <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={p.id}>
               <Card sx={{ border: `1px solid ${tokens.line}`, borderRadius: 3, boxShadow: "none", height: "100%", position: "relative" }}>
-                <Stack
+                {isAdmin && <Stack
                   direction="row"
                   spacing={0.5}
                   sx={{ position: "absolute", top: 8, right: 8, zIndex: 1, bgcolor: "rgba(255,255,255,0.9)", borderRadius: 2 }}
@@ -139,7 +147,7 @@ export default function Products() {
                   <IconButton size="small" onClick={() => handleDelete(p.id)}>
                     <DeleteOutlinedIcon fontSize="small" sx={{ color: tokens.coral }} />
                   </IconButton>
-                </Stack>
+                </Stack>}
 
                 <CardMedia
                   component="img"
@@ -154,7 +162,7 @@ export default function Products() {
                   <Chip label={p.category} size="small" sx={{ bgcolor: tokens.paper, mb: 1, fontSize: 11 }} />
                   <Typography sx={{ fontWeight: 600, lineHeight: 1.3 }}>{p.productName}</Typography>
                   <Typography variant="caption" sx={{ color: tokens.slate }}>{p.brand}</Typography>
-                  <Stack direction="row" justifyContent="space-between" sx={{ mt: 1.5 }}>
+                  <Stack direction="row" sx={{ mt: 1.5, justifyContent: "space-between" }}>
                     <Typography className="mono" sx={{ fontWeight: 700 }}>₹{p.price}</Typography>
                     <Typography variant="body2">{p.rating}★</Typography>
                   </Stack>
