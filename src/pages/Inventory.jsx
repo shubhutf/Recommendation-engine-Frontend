@@ -11,9 +11,10 @@ import {
   IconButton,
   TextField,
   CircularProgress,
+  Alert,
 } from "@mui/material";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
-import CheckIcon from "@mui/icons-material/Check";
+import CheckIcon from "@mui/icons-material/CheckOutlined";
 import { getAllInventory, updateInventory } from "../mockApi/client.js";
 import { tokens } from "../theme/theme.js";
 
@@ -22,15 +23,17 @@ export default function Inventory() {
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
   const [draftQty, setDraftQty] = useState("");
+  const [error, setError] = useState("");
 
   async function load() {
     setLoading(true);
-    setRows(await getAllInventory());
-    setLoading(false);
+    try { setRows(await getAllInventory()); setError(""); }
+    catch (err) { setError(err.response?.data?.message || "Unable to load inventory"); }
+    finally { setLoading(false); }
   }
 
   useEffect(() => {
-    load();
+    Promise.resolve().then(load);
   }, []);
 
   function startEdit(row) {
@@ -39,12 +42,14 @@ export default function Inventory() {
   }
 
  async function saveEdit(row) {
+    try {
     await updateInventory(row.id, {
       productId: row.productId,
       availableQuantity: Number(draftQty),
     });
     setEditingId(null);
     load();
+    } catch (err) { setError(err.response?.data?.message || "Unable to save inventory"); }
   }
 
   if (loading) {
@@ -53,6 +58,7 @@ export default function Inventory() {
 
   return (
     <Box>
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       <Typography variant="body2" sx={{ color: tokens.slate, mb: 3 }}>
         Stock levels drive the "Inventory Availability" factor in the recommendation engine —
         in-stock products always outrank out-of-stock ones.

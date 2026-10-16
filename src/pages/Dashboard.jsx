@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Box, Typography, Stack, Chip, CircularProgress } from "@mui/material";
+import { Alert, Box, Typography, Stack, Chip, CircularProgress } from "@mui/material";
 import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutlined";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutlined";
@@ -12,9 +12,11 @@ export default function Dashboard() {
   const [products, setProducts] = useState([]);
   const [topRecommended, setTopRecommended] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     (async () => {
+      try {
       const [productList, summary] = await Promise.all([
         getAllProducts(),
         getAnalyticsSummary(),
@@ -23,7 +25,8 @@ export default function Dashboard() {
       setTopRecommended(
         summary.topRecommendedProducts.filter((r) => r.productName).slice(0, 5)
       );
-      setLoading(false);
+      } catch (err) { setError(err.response?.data?.message || "Unable to load dashboard"); }
+      finally { setLoading(false); }
     })();
   }, []);
 
@@ -38,6 +41,7 @@ export default function Dashboard() {
       </Box>
     );
   }
+  if (error) return <Alert severity="error">{error}</Alert>;
 
   return (
     <Box>
